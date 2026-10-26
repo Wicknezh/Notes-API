@@ -10,7 +10,21 @@ from app.security import decode_access_token
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
+oauth2_optional = OAuth2PasswordBearer(tokenUrl="/auth/login", auto_error=False)
+
 DbSession = Annotated[Session, Depends(get_db)]
+
+def get_optional_user(
+    token: Annotated[str | None, Depends(oauth2_optional)], db: DbSession
+) -> User | None:
+    """Return the logged-in user, or None if there is no valid token."""
+    if not token:
+        return None
+    user_id = decode_access_token(token)
+    return db.get(User, user_id) if user_id is not None else None
+
+OptionalUser = Annotated[User | None, Depends(get_optional_user)]
+
 
 
 def get_current_user(
