@@ -7,22 +7,56 @@ from app.models import Role
 from tests.conftest import PASSWORD
 
 
-def test_register_creates_user_role(client):
+def test_register_defaults_to_viewer(client):
     r = client.post("/auth/register", json={"username": "newbie", "password": PASSWORD})
     assert r.status_code == 201
-    body = r.json()
-    assert body["username"] == "newbie"
-    assert body["role"] == "user"
-    assert "hashed_password" not in body
+    assert r.json()["role"] == "viewer"
+    assert "hashed_password" not in r.json()
 
 
-def test_register_cannot_choose_admin_role(client):
+def test_register_with_user_role(client):
+    r = client.post(
+        "/auth/register",
+        json={"username": "bob", "password": PASSWORD, "role": "user"},
+    )
+    assert r.status_code == 201
+    assert r.json()["role"] == "user"
+
+
+def test_register_invalid_role_422(client):
+    r = client.post(
+        "/auth/register",
+        json={"username": "bob", "password": PASSWORD, "role": "superuser"},
+    )
+    assert r.status_code == 422
+
+
+def test_register_admin_without_login_401(client):
     r = client.post(
         "/auth/register",
         json={"username": "sneaky", "password": PASSWORD, "role": "admin"},
     )
+    assert r.status_code == 401
+
+
+def test_register_admin_as_user_403(client, alice):
+    r = client.post(
+        "/auth/register",
+        json={"username": "sneaky", "password": PASSWORD, "role": "admin"},
+        headers=alice,
+    )
+    assert r.status_code == 403
+
+
+def test_register_admin_as_admin_201(client, admin):
+    r = client.post(
+        "/auth/register",
+        json={"username": "boss2", "password": PASSWORD, "role": "admin"},
+        headers=admin,
+    )
     assert r.status_code == 201
-    assert r.json()["role"] == "user" 
+    assert r.json()["role"] == "admin"
+
 
 def test_register_duplicate_username_409(client):
     payload = {"username": "dupe", "password": PASSWORD}
